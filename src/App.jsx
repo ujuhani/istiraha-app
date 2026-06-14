@@ -1,3 +1,4 @@
+import React from "react";
 import { useState, useMemo, useEffect } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore";
