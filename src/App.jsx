@@ -1,12 +1,371 @@
-import React from "react";
-export default function App() {
-  return (
-    <div style={{padding:20,fontFamily:"Arial",direction:"rtl",background:"#1E3A5F",minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center"}}>
-      <div style={{background:"white",borderRadius:20,padding:40,textAlign:"center"}}>
-        <div style={{fontSize:40}}>🏡</div>
-        <h1 style={{color:"#1E3A5F"}}>محاسبة الاستراحة</h1>
-        <p style={{color:"#64748B"}}>يشتغل!</p>
+import { useState, useMemo, useEffect } from "react";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDhikmn2Vu-m2DF0bP6uIqnJZGkgyMLoIk",
+  authDomain: "istiraha-f94f0.firebaseapp.com",
+  projectId: "istiraha-f94f0",
+  storageBucket: "istiraha-f94f0.firebasestorage.app",
+  messagingSenderId: "841224975321",
+  appId: "1:841224975321:web:add62f9ab1da8e146c1fc8"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
+const MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
+const CATEGORIES = ["خدمات","مستلزمات","صيانة ونظافة","طعام وشراب","أخرى"];
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = [CURRENT_YEAR-1, CURRENT_YEAR, CURRENT_YEAR+1];
+
+function todayStr() { return new Date().toISOString().slice(0,10); }
+function getMonthName(d) { return d ? MONTHS[new Date(d).getMonth()] : ""; }
+function fmt(n) {
+  if (n==null||isNaN(n)) return "—";
+  return Number(n).toLocaleString("ar-SA",{minimumFractionDigits:0,maximumFractionDigits:0})+" ر.س";
+}
+
+const IcPlus  = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+const IcTrash = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>;
+const IcUsers = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const IcCalc  = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/></svg>;
+const IcX     = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+
+const T = {
+  navy:"#1E3A5F",blue:"#2563EB",blueLight:"#EFF6FF",
+  green:"#16A34A",greenLight:"#DCFCE7",greenDark:"#14532D",
+  red:"#EF4444",redLight:"#FEE2E2",redDark:"#7F1D1D",
+  amber:"#F59E0B",amberLight:"#FEF3C7",
+  orange:"#F97316",orangeLight:"#FFF3E0",
+  slate:"#F8FAFC",slate2:"#F1F5F9",slate3:"#E2E8F0",
+  gray:"#64748B",darkGray:"#334155",white:"#FFFFFF",
+  purple:"#7C3AED",purpleLight:"#EDE9FE",
+  font:"'Tajawal',Arial,sans-serif",
+};
+
+const inputSt={width:"100%",padding:"9px 11px",border:`1.5px solid ${T.slate3}`,borderRadius:10,fontSize:14,fontFamily:T.font,color:T.darkGray,outline:"none",boxSizing:"border-box",background:T.slate,transition:"border .15s"};
+const selectSt={...inputSt,cursor:"pointer"};
+
+function Btn({children,onClick,color=T.navy,textColor=T.white,size="md",style={},disabled=false}){
+  const pad=size==="sm"?"7px 13px":size==="lg"?"12px 22px":"9px 16px";
+  const fsz=size==="sm"?12:size==="lg"?15:13;
+  return <button onClick={onClick} disabled={disabled} style={{background:disabled?"#CBD5E1":color,color:disabled?"#94A3B8":textColor,border:"none",borderRadius:10,padding:pad,fontSize:fsz,fontWeight:700,cursor:disabled?"not-allowed":"pointer",display:"flex",alignItems:"center",gap:6,fontFamily:T.font,transition:"opacity .15s",whiteSpace:"nowrap",...style}} onMouseEnter={e=>{if(!disabled)e.currentTarget.style.opacity=".85"}} onMouseLeave={e=>{e.currentTarget.style.opacity="1"}}>{children}</button>;
+}
+
+function Field({label,required,error,children}){
+  return <div style={{marginBottom:14}}><label style={{display:"block",fontSize:12,fontWeight:700,color:T.gray,marginBottom:5,fontFamily:T.font}}>{label}{required&&<span style={{color:T.red,marginRight:3}}>*</span>}</label>{children}{error&&<div style={{fontSize:11,color:T.red,marginTop:3,fontFamily:T.font}}>{error}</div>}</div>;
+}
+
+function Modal({title,onClose,children,width=380}){
+  return <div style={{position:"fixed",inset:0,background:"rgba(10,20,50,.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,backdropFilter:"blur(3px)"}} onClick={e=>e.target===e.currentTarget&&onClose()}><div style={{background:T.white,borderRadius:20,padding:"24px 26px",width,maxWidth:"95vw",maxHeight:"90vh",overflowY:"auto",boxShadow:"0 24px 64px rgba(0,0,0,.25)",direction:"rtl",fontFamily:T.font}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}><span style={{fontSize:17,fontWeight:800,color:T.navy}}>{title}</span><button onClick={onClose} style={{background:T.slate2,border:"none",borderRadius:8,width:30,height:30,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:T.gray}}><IcX/></button></div>{children}</div></div>;
+}
+
+function Toast({msg,type}){
+  if(!msg)return null;
+  return <div style={{position:"fixed",bottom:28,left:"50%",transform:"translateX(-50%)",background:type==="error"?T.red:type==="warn"?T.amber:T.green,color:T.white,padding:"10px 26px",borderRadius:14,fontFamily:T.font,fontSize:14,fontWeight:700,boxShadow:"0 6px 24px rgba(0,0,0,.22)",zIndex:9999,animation:"fadeup .25s ease"}}>{msg}</div>;
+}
+
+function KPI({label,value,color,sub,icon}){
+  return <div style={{background:T.white,borderRadius:16,padding:"16px 18px",boxShadow:"0 2px 10px rgba(0,0,0,.07)",borderTop:`4px solid ${color}`,flex:1,minWidth:0}}><div style={{fontSize:20,marginBottom:2}}>{icon}</div><div style={{fontSize:10,color:T.gray,fontWeight:700,letterSpacing:.4,marginBottom:3,fontFamily:T.font}}>{label}</div><div style={{fontSize:20,fontWeight:800,color,fontFamily:T.font}}>{value}</div>{sub&&<div style={{fontSize:11,color:T.gray,marginTop:2,fontFamily:T.font}}>{sub}</div>}</div>;
+}
+
+const TH={padding:"8px 11px",fontSize:11,fontWeight:700,color:T.white,background:T.navy,textAlign:"right",fontFamily:T.font,whiteSpace:"nowrap"};
+const TD={padding:"8px 11px",fontSize:12,color:T.darkGray,borderBottom:`1px solid ${T.slate2}`,textAlign:"right",fontFamily:T.font};
+
+export default function App(){
+  const [members,setMembers]=useState([]);
+  const [income,setIncome]=useState([]);
+  const [expenses,setExpenses]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [modal,setModal]=useState(null);
+  const [incF,setIncF]=useState({memberName:"",month:"",year:CURRENT_YEAR,date:todayStr(),amount:""});
+  const [expF,setExpF]=useState({desc:"",cat:"",date:todayStr(),amount:""});
+  const [memF,setMemF]=useState({name:"",type:"regular"});
+  const [incErr,setIncErr]=useState({});
+  const [expErr,setExpErr]=useState({});
+  const [memErr,setMemErr]=useState({});
+  const [budgetMonth,setBudgetMonth]=useState("");
+  const [budgetYear,setBudgetYear]=useState(CURRENT_YEAR);
+  const [budgetResult,setBudgetResult]=useState(null);
+  const [toast,setToast]=useState(null);
+  const showToast=(msg,type="success")=>{setToast({msg,type});setTimeout(()=>setToast(null),2600);};
+
+  useEffect(()=>{
+    const u1=onSnapshot(collection(db,"members"),s=>{setMembers(s.docs.map(d=>({id:d.id,...d.data()})));setLoading(false);});
+    const u2=onSnapshot(collection(db,"income"),s=>{setIncome(s.docs.map(d=>({id:d.id,...d.data()})));});
+    const u3=onSnapshot(collection(db,"expenses"),s=>{setExpenses(s.docs.map(d=>({id:d.id,...d.data()})));});
+    return()=>{u1();u2();u3();};
+  },[]);
+
+  const plusMembers=useMemo(()=>members.filter(m=>m.type==="plus"),[members]);
+  const totalInc=useMemo(()=>income.reduce((s,r)=>s+r.amount,0),[income]);
+  const totalExp=useMemo(()=>expenses.reduce((s,r)=>s+r.amount,0),[expenses]);
+  const balance=totalInc-totalExp;
+
+  const submitMember=async()=>{
+    const err={};
+    if(!memF.name.trim())err.name="أدخل الاسم";
+    if(members.some(m=>m.name===memF.name.trim()))err.name="الاسم مكرر";
+    setMemErr(err);if(Object.keys(err).length)return;
+    await addDoc(collection(db,"members"),{name:memF.name.trim(),type:memF.type,createdAt:Date.now()});
+    setMemF({name:"",type:"regular"});showToast("✅ تم إضافة العضو");
+  };
+
+  const submitIncome=async()=>{
+    const err={};
+    if(!incF.memberName)err.member="اختر العضو";
+    if(!incF.month)err.month="اختر الشهر";
+    if(!incF.date)err.date="أدخل تاريخ الدفع";
+    const amt=parseFloat(incF.amount);
+    if(!incF.amount||isNaN(amt)||amt<=0)err.amount="أدخل مبلغاً صحيحاً";
+    setIncErr(err);if(Object.keys(err).length)return;
+    await addDoc(collection(db,"income"),{memberName:incF.memberName,month:incF.month,year:incF.year,date:incF.date,amount:amt,createdAt:Date.now()});
+    setIncF({memberName:"",month:"",year:CURRENT_YEAR,date:todayStr(),amount:""});
+    setModal(null);showToast("✅ تم تسجيل الإيراد");
+  };
+
+  const submitExpense=async()=>{
+    const err={};
+    if(!expF.desc.trim())err.desc="أدخل وصف المصروف";
+    const amt=parseFloat(expF.amount);
+    if(!expF.amount||isNaN(amt)||amt<=0)err.amount="أدخل مبلغاً صحيحاً";
+    setExpErr(err);if(Object.keys(err).length)return;
+    await addDoc(collection(db,"expenses"),{desc:expF.desc.trim(),cat:expF.cat||"أخرى",date:expF.date||todayStr(),amount:amt,createdAt:Date.now()});
+    setExpF({desc:"",cat:"",date:todayStr(),amount:""});
+    setModal(null);showToast("✅ تم تسجيل المصروف");
+  };
+
+  const del=async(col,id)=>{await deleteDoc(doc(db,col,id));};
+
+  const calcBudget=()=>{
+    if(!budgetMonth){showToast("اختر الشهر أولاً","warn");return;}
+    const mInc=income.filter(r=>r.month===budgetMonth&&r.year===budgetYear).reduce((s,r)=>s+r.amount,0);
+    const mExp=expenses.filter(r=>getMonthName(r.date)===budgetMonth&&new Date(r.date).getFullYear()===budgetYear).reduce((s,r)=>s+r.amount,0);
+    const bal=mInc-mExp;
+    const deficit=bal<0?Math.abs(bal):0;
+    const equalShare=plusMembers.length>0?deficit/plusMembers.length:0;
+    const memberBreakdown=plusMembers.map(m=>{
+      const paid=income.filter(r=>r.memberName===m.name&&r.month===budgetMonth&&r.year===budgetYear).reduce((s,r)=>s+r.amount,0);
+      return{...m,paid,equalShare,remaining:Math.max(0,equalShare-paid)};
+    });
+    setBudgetResult({month:budgetMonth,year:budgetYear,mInc,mExp,bal,deficit,equalShare,memberBreakdown});
+    setModal("budget");
+  };
+
+  if(loading)return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",fontFamily:T.font,color:T.navy,fontSize:18,flexDirection:"column",gap:12}}><div style={{fontSize:40}}>🏡</div><div>جاري التحميل...</div></div>;
+
+  return(
+    <div style={{minHeight:"100vh",background:"#EEF2F7",fontFamily:T.font,direction:"rtl",padding:"18px 14px"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;600;700;800&display=swap');
+        *{box-sizing:border-box}
+        input:focus,select:focus{border-color:#2563EB!important;background:#fff!important;outline:none}
+        button:active{transform:scale(.97)}
+        @keyframes fadeup{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
+        ::-webkit-scrollbar{width:5px;height:5px}::-webkit-scrollbar-thumb{background:#CBD5E1;border-radius:4px}
+        tr:hover td{background:#F8FAFC!important}
+        .badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+      `}</style>
+
+      <div style={{background:`linear-gradient(135deg,${T.navy} 0%,${T.blue} 100%)`,borderRadius:20,padding:"20px 24px",marginBottom:18,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:800,color:T.white}}>🏡 محاسبة الاستراحة</div>
+          <div style={{fontSize:12,color:"#BFDBFE",marginTop:3}}>{plusMembers.length} أعضاء+ · {members.filter(m=>m.type==="regular").length} أعضاء عاديون</div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
+          <Btn color={T.red} style={{width:180,justifyContent:"center"}} onClick={()=>{setExpF({desc:"",cat:"",date:todayStr(),amount:""});setExpErr({});setModal("expense");}}><IcPlus/> مصروف جديد</Btn>
+          <Btn color={T.green} style={{width:180,justifyContent:"center"}} onClick={()=>{setIncF({memberName:"",month:"",year:CURRENT_YEAR,date:todayStr(),amount:""});setIncErr({});setModal("income");}}><IcPlus/> إيراد جديد</Btn>
+          <Btn color={T.white} textColor={T.navy} style={{width:180,justifyContent:"center"}} onClick={()=>setModal("members")}><IcUsers/> الأعضاء</Btn>
+        </div>
       </div>
+
+      <div style={{display:"flex",gap:14,marginBottom:18,flexWrap:"wrap"}}>
+        <KPI label="إجمالي الإيرادات" value={fmt(totalInc)} color={T.green} icon="💰" sub={`${income.length} عملية`}/>
+        <KPI label="إجمالي المصاريف" value={fmt(totalExp)} color={T.red} icon="📤" sub={`${expenses.length} عملية`}/>
+        <KPI label="الرصيد الحالي" value={fmt(Math.abs(balance))} color={balance>=0?T.blue:T.orange} icon={balance>=0?"✅":"⚠️"} sub={balance>=0?"فائض":"عجز"}/>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16,marginBottom:16}}>
+        <div style={{background:T.white,borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,.07)",overflow:"hidden"}}>
+          <div style={{background:`linear-gradient(90deg,${T.greenDark}ee,${T.greenDark}bb)`,padding:"13px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:T.white,fontWeight:700,fontSize:15}}>💰 سجل الإيرادات</span>
+            <Btn size="sm" color={T.white} textColor={T.greenDark} onClick={()=>{setIncF({memberName:"",month:"",year:CURRENT_YEAR,date:todayStr(),amount:""});setIncErr({});setModal("income");}}><IcPlus/> إضافة</Btn>
+          </div>
+          <div style={{overflowX:"auto",maxHeight:320,overflowY:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead style={{position:"sticky",top:0}}><tr>{["العضو","الشهر","السنة","المبلغ",""].map(h=><th key={h} style={TH}>{h}</th>)}</tr></thead>
+              <tbody>
+                {income.length===0&&<tr><td colSpan={5} style={{...TD,textAlign:"center",color:T.gray,padding:20}}>لا توجد إيرادات</td></tr>}
+                {[...income].sort((a,b)=>b.createdAt-a.createdAt).map(r=>(
+                  <tr key={r.id}>
+                    <td style={TD}><div style={{display:"flex",alignItems:"center",gap:6}}><span style={{width:7,height:7,borderRadius:"50%",flexShrink:0,background:members.find(m=>m.name===r.memberName)?.type==="plus"?T.purple:T.gray}}/>{r.memberName}</div></td>
+                    <td style={TD}>{r.month}</td>
+                    <td style={{...TD,color:T.gray,fontSize:11}}>{r.year}</td>
+                    <td style={{...TD,color:T.green,fontWeight:700}}>{fmt(r.amount)}</td>
+                    <td style={{...TD,padding:"5px 8px"}}><button onClick={()=>del("income",r.id)} style={{background:T.redLight,border:"none",borderRadius:6,padding:"4px 6px",cursor:"pointer",color:T.red,display:"flex"}}><IcTrash/></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{background:T.white,borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,.07)",overflow:"hidden"}}>
+          <div style={{background:`linear-gradient(90deg,${T.redDark}ee,${T.redDark}bb)`,padding:"13px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:T.white,fontWeight:700,fontSize:15}}>📤 سجل المصاريف</span>
+            <Btn size="sm" color={T.white} textColor={T.redDark} onClick={()=>{setExpF({desc:"",cat:"",date:todayStr(),amount:""});setExpErr({});setModal("expense");}}><IcPlus/> إضافة</Btn>
+          </div>
+          <div style={{overflowX:"auto",maxHeight:320,overflowY:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead style={{position:"sticky",top:0}}><tr>{["البيان","التصنيف","التاريخ","المبلغ",""].map(h=><th key={h} style={TH}>{h}</th>)}</tr></thead>
+              <tbody>
+                {expenses.length===0&&<tr><td colSpan={5} style={{...TD,textAlign:"center",color:T.gray,padding:20}}>لا توجد مصاريف</td></tr>}
+                {[...expenses].sort((a,b)=>b.createdAt-a.createdAt).map(r=>(
+                  <tr key={r.id}>
+                    <td style={TD}>{r.desc}</td>
+                    <td style={TD}><span className="badge" style={{background:T.slate2,color:T.gray}}>{r.cat}</span></td>
+                    <td style={{...TD,color:T.gray,fontSize:11}}>{r.date}</td>
+                    <td style={{...TD,color:T.red,fontWeight:700}}>{fmt(r.amount)}</td>
+                    <td style={{...TD,padding:"5px 8px"}}><button onClick={()=>del("expenses",r.id)} style={{background:T.redLight,border:"none",borderRadius:6,padding:"4px 6px",cursor:"pointer",color:T.red,display:"flex"}}><IcTrash/></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+        <select value={budgetYear} onChange={e=>{setBudgetYear(Number(e.target.value));setBudgetResult(null);}} style={{...selectSt,width:110,flex:"none"}}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select>
+        <select value={budgetMonth} onChange={e=>{setBudgetMonth(e.target.value);setBudgetResult(null);}} style={{...selectSt,width:160,flex:"none"}}><option value="">— اختر الشهر —</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select>
+        <Btn size="lg" color={T.navy} style={{flex:1,justifyContent:"center",minWidth:200}} onClick={calcBudget}><IcCalc/> احسب موازنة الشهر وتوزيع العجز على الأعضاء+</Btn>
+      </div>
+
+      {modal==="members"&&(
+        <Modal title={`👥 الأعضاء (${members.length})`} onClose={()=>setModal(null)} width={440}>
+          <div style={{background:T.blueLight,borderRadius:12,padding:"14px 16px",marginBottom:16}}>
+            <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:10}}>إضافة عضو جديد</div>
+            <div style={{display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}>
+              <div style={{flex:2,minWidth:120}}>
+                <input style={{...inputSt,borderColor:memErr.name?T.red:T.slate3}} placeholder="اسم العضو" value={memF.name} onChange={e=>setMemF(p=>({...p,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&submitMember()}/>
+                {memErr.name&&<div style={{fontSize:11,color:T.red,marginTop:2}}>{memErr.name}</div>}
+              </div>
+              <div style={{flex:1,minWidth:100}}>
+                <select style={selectSt} value={memF.type} onChange={e=>setMemF(p=>({...p,type:e.target.value}))}><option value="regular">عضو</option><option value="plus">عضو+</option></select>
+              </div>
+              <Btn color={T.blue} onClick={submitMember}><IcPlus/> إضافة</Btn>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:16,marginBottom:12,fontSize:12,color:T.gray}}>
+            <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:T.purple,marginLeft:5}}/>عضو+ يغطي العجز</span>
+            <span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:T.gray,marginLeft:5}}/>عضو عادي</span>
+          </div>
+          <div style={{maxHeight:340,overflowY:"auto"}}>
+            {members.length===0&&<div style={{textAlign:"center",color:T.gray,padding:20}}>لا يوجد أعضاء — أضف أول عضو</div>}
+            {members.map(m=>(
+              <div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",borderRadius:10,marginBottom:6,background:m.type==="plus"?T.purpleLight:T.slate2}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <span style={{width:34,height:34,borderRadius:"50%",background:m.type==="plus"?T.purple:T.gray,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700}}>{m.name[0]}</span>
+                  <div><div style={{fontWeight:700,color:T.darkGray,fontSize:14}}>{m.name}</div><span className="badge" style={{background:m.type==="plus"?T.purple:T.gray,color:T.white,fontSize:10}}>{m.type==="plus"?"عضو+":"عضو"}</span></div>
+                </div>
+                <button onClick={()=>del("members",m.id)} style={{background:T.redLight,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer",color:T.red,display:"flex"}}><IcTrash/></button>
+              </div>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {modal==="income"&&(
+        <Modal title="💰 تسجيل إيراد جديد" onClose={()=>setModal(null)}>
+          <Field label="العضو" required error={incErr.member}>
+            <select style={{...selectSt,borderColor:incErr.member?T.red:T.slate3}} value={incF.memberName} onChange={e=>setIncF(p=>({...p,memberName:e.target.value}))}>
+              <option value="">— اختر العضو —</option>
+              {members.filter(m=>m.type==="plus").length>0&&<optgroup label="── أعضاء+">{members.filter(m=>m.type==="plus").map(m=><option key={m.id} value={m.name}>{m.name} (عضو+)</option>)}</optgroup>}
+              {members.filter(m=>m.type==="regular").length>0&&<optgroup label="── أعضاء عاديون">{members.filter(m=>m.type==="regular").map(m=><option key={m.id} value={m.name}>{m.name}</option>)}</optgroup>}
+            </select>
+          </Field>
+          <Field label="الشهر الذي يخص هذا المبلغ" required error={incErr.month}>
+            <select style={{...selectSt,borderColor:incErr.month?T.red:T.slate3}} value={incF.month} onChange={e=>setIncF(p=>({...p,month:e.target.value}))}><option value="">— اختر الشهر —</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select>
+          </Field>
+          <Field label="السنة" required>
+            <select style={selectSt} value={incF.year} onChange={e=>setIncF(p=>({...p,year:Number(e.target.value)}))}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select>
+          </Field>
+          <Field label="تاريخ الدفع" required error={incErr.date}>
+            <input type="date" style={{...inputSt,borderColor:incErr.date?T.red:T.slate3}} value={incF.date} onChange={e=>setIncF(p=>({...p,date:e.target.value}))}/>
+          </Field>
+          <Field label="المبلغ (ر.س)" required error={incErr.amount}>
+            <input type="number" min="1" style={{...inputSt,borderColor:incErr.amount?T.red:T.slate3}} placeholder="100" value={incF.amount} onChange={e=>setIncF(p=>({...p,amount:e.target.value}))}/>
+          </Field>
+          <div style={{display:"flex",gap:10,marginTop:4}}>
+            <Btn color={T.green} style={{flex:1,justifyContent:"center"}} onClick={submitIncome}>تسجيل الإيراد</Btn>
+            <Btn color={T.slate2} textColor={T.gray} style={{flex:1,justifyContent:"center"}} onClick={()=>setModal(null)}>إلغاء</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {modal==="expense"&&(
+        <Modal title="📤 تسجيل مصروف جديد" onClose={()=>setModal(null)}>
+          <Field label="وصف المصروف" required error={expErr.desc}>
+            <input style={{...inputSt,borderColor:expErr.desc?T.red:T.slate3}} placeholder="مثال: فاتورة الكهرباء" value={expF.desc} onChange={e=>setExpF(p=>({...p,desc:e.target.value}))}/>
+          </Field>
+          <Field label="التصنيف (اختياري)">
+            <select style={selectSt} value={expF.cat} onChange={e=>setExpF(p=>({...p,cat:e.target.value}))}><option value="">— اختر تصنيفاً —</option>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select>
+          </Field>
+          <Field label="المبلغ (ر.س)" required error={expErr.amount}>
+            <input type="number" min="1" style={{...inputSt,borderColor:expErr.amount?T.red:T.slate3}} placeholder="0" value={expF.amount} onChange={e=>setExpF(p=>({...p,amount:e.target.value}))}/>
+          </Field>
+          <Field label="التاريخ">
+            <input type="date" style={inputSt} value={expF.date} onChange={e=>setExpF(p=>({...p,date:e.target.value}))}/>
+            <div style={{fontSize:11,color:T.gray,marginTop:3}}>يُملأ تلقائياً باليوم الحالي</div>
+          </Field>
+          <div style={{display:"flex",gap:10,marginTop:4}}>
+            <Btn color={T.red} style={{flex:1,justifyContent:"center"}} onClick={submitExpense}>تسجيل المصروف</Btn>
+            <Btn color={T.slate2} textColor={T.gray} style={{flex:1,justifyContent:"center"}} onClick={()=>setModal(null)}>إلغاء</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {modal==="budget"&&budgetResult&&(
+        <Modal title={`📊 موازنة ${budgetResult.month} ${budgetResult.year}`} onClose={()=>setModal(null)} width={480}>
+          <div style={{display:"flex",gap:10,marginBottom:18,flexWrap:"wrap"}}>
+            {[{label:"الإيرادات",val:budgetResult.mInc,color:T.green,bg:T.greenLight},{label:"المصاريف",val:budgetResult.mExp,color:T.red,bg:T.redLight},{label:budgetResult.bal>=0?"فائض":"عجز",val:Math.abs(budgetResult.bal),color:budgetResult.bal>=0?T.blue:T.orange,bg:budgetResult.bal>=0?"#EFF6FF":T.orangeLight}].map(item=>(
+              <div key={item.label} style={{flex:1,minWidth:110,background:item.bg,borderRadius:12,padding:"12px 14px",textAlign:"center"}}>
+                <div style={{fontSize:10,color:T.gray,fontWeight:700,marginBottom:4}}>{item.label}</div>
+                <div style={{fontSize:17,fontWeight:800,color:item.color}}>{fmt(item.val)}</div>
+              </div>
+            ))}
+          </div>
+          {budgetResult.deficit>0?(
+            <>
+              <div style={{background:T.amberLight,border:`1px solid ${T.amber}44`,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#92400E"}}>
+                ⚠️ عجز <strong>{fmt(budgetResult.deficit)}</strong> على {budgetResult.memberBreakdown.length} أعضاء+ — نصيب كل عضو <strong>{fmt(budgetResult.equalShare)}</strong>
+              </div>
+              <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:8}}>نصيب كل عضو+ بعد خصم ما دفعه:</div>
+              <div style={{borderRadius:12,overflow:"hidden",border:`1px solid ${T.slate3}`}}>
+                <table style={{width:"100%",borderCollapse:"collapse"}}>
+                  <thead><tr>{["العضو","نصيبه","دفع","المتبقي"].map(h=><th key={h} style={{...TH,background:T.navy,fontSize:11,padding:"9px 10px"}}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {budgetResult.memberBreakdown.map(m=>(
+                      <tr key={m.id}>
+                        <td style={TD}><div style={{display:"flex",alignItems:"center",gap:7}}><span style={{width:28,height:28,borderRadius:"50%",background:T.purple,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,flexShrink:0}}>{m.name[0]}</span>{m.name}</div></td>
+                        <td style={{...TD,color:T.orange,fontWeight:700}}>{fmt(m.equalShare)}</td>
+                        <td style={{...TD,color:m.paid>0?T.green:T.gray,fontWeight:m.paid>0?700:400}}>{m.paid>0?fmt(m.paid):"لم يدفع"}</td>
+                        <td style={TD}>{m.remaining<=0?<span className="badge" style={{background:T.greenLight,color:T.green}}>✅ مسدَّد</span>:<span style={{color:T.red,fontWeight:700}}>{fmt(m.remaining)}</span>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ):(
+            <div style={{background:T.greenLight,border:`1px solid ${T.green}44`,borderRadius:10,padding:"14px 16px",textAlign:"center",color:T.greenDark,fontSize:14}}>✅ لا يوجد عجز في {budgetResult.month} {budgetResult.year}</div>
+          )}
+          <div style={{marginTop:18}}><Btn color={T.navy} style={{width:"100%",justifyContent:"center"}} onClick={()=>setModal(null)}>إغلاق</Btn></div>
+        </Modal>
+      )}
+
+      {toast&&<Toast msg={toast.msg} type={toast.type}/>}
     </div>
   );
 }
