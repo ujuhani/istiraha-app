@@ -77,7 +77,7 @@ export default function App(){
   const [members,setMembers]=useState([]);
   const [income,setIncome]=useState([]);
   const [expenses,setExpenses]=useState([]);
-  const [loading,setLoading]=useState(true);
+  const [loading,setLoading]=useState(false);
   const [modal,setModal]=useState(null);
   const [incF,setIncF]=useState({memberName:"",month:"",year:CURRENT_YEAR,date:todayStr(),amount:""});
   const [expF,setExpF]=useState({desc:"",cat:"",date:todayStr(),amount:""});
