@@ -171,7 +171,7 @@ export default function App(){
 
       <div style={{background:`linear-gradient(135deg,${T.navy} 0%,${T.blue} 100%)`,borderRadius:20,padding:"20px 24px",marginBottom:18,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
         <div>
-          <div style={{fontSize:22,fontWeight:800,color:T.white}}>🏡 محاسبة الاستراحة</div>
+          <div style={{fontSize:22,fontWeight:800,color:T.white}}>🏡 حساب الاستراحة</div>
           <div style={{fontSize:12,color:"#BFDBFE",marginTop:3}}>{plusMembers.length} أعضاء+ · {members.filter(m=>m.type==="regular").length} أعضاء عاديون</div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
