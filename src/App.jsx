@@ -7,7 +7,7 @@ const firebaseApp=initializeApp(firebaseConfig);
 const db=getFirestore(firebaseApp);
 const MONTHS=["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
 const MONTH_ORDER={"يناير":1,"فبراير":2,"مارس":3,"أبريل":4,"مايو":5,"يونيو":6,"يوليو":7,"أغسطس":8,"سبتمبر":9,"أكتوبر":10,"نوفمبر":11,"ديسمبر":12};
-const FIRST_BALANCE_MONTH="يونيو";const FIRST_BALANCE_YEAR=2026;
+const FIRST_BALANCE_MONTH="مايو";const FIRST_BALANCE_YEAR=2026;
 const CATEGORIES=["خدمات","مستلزمات","صيانة ونظافة","طعام وشراب","أخرى"];
 const CURRENT_YEAR=new Date().getFullYear();
 const YEARS=[CURRENT_YEAR-1,CURRENT_YEAR,CURRENT_YEAR+1];
