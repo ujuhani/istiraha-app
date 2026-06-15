@@ -118,7 +118,7 @@ export default function App(){
       <select value={budgetMonth} onChange={e=>{setBudgetMonth(e.target.value);setBudgetResult(null);}} style={{...selectSt,width:160,flex:"none"}}><option value="">— اختر الشهر —</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select>
       <Btn size="lg" color={T.navy} style={{flex:1,justifyContent:"center",minWidth:200}} onClick={calcBudget}><IcCalc/> احسب موازنة الشهر وتوزيع العجز على الأعضاء+</Btn>
     </div>
-    {activeDebts.length>0&&(<div style={{background:T.white,borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,.07)",overflow:"hidden",marginBottom:16}}>
+    (<div style={{background:T.white,borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,.07)",overflow:"hidden",marginBottom:16}}>
       <div style={{background:`linear-gradient(90deg,${T.purple}ee,${T.purple}bb)`,padding:"13px 18px"}}><span style={{color:T.white,fontWeight:700,fontSize:15}}>💳 الديون ({activeDebts.length})</span></div>
       <div style={{overflowX:"auto"}}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
