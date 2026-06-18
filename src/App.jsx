@@ -105,7 +105,7 @@ export default function App(){
     const nextIdx=monthIndex(nextAllowedMonth.month,nextAllowedMonth.year);
     if(selectedIdx!==nextIdx){showToast(`⚠️ يجب إجراء موازنة ${nextAllowedMonth.month} ${nextAllowedMonth.year} أولاً`,"warn");return;}
     const mInc=income.filter(r=>r.month===budgetMonth&&r.year===budgetYear).reduce((s,r)=>s+r.amount,0);
-    const mExp=expenses.filter(r=>getMonthName(r.date)===budgetMonth&&new Date(r.date).getFullYear()===budgetYear).reduce((s,r)=>s+r.amount,0);
+    const mExp=expenses.filter(r=>{const d=new Date(r.date);return MONTHS[d.getMonth()]===budgetMonth&&d.getFullYear()===budgetYear;}).reduce((s,r)=>s+r.amount,0);
     const bal=mInc-mExp;const deficit=bal<0?Math.abs(bal):0;
     const equalShare=plusMembers.length>0?deficit/plusMembers.length:0;
     const memberBreakdown=plusMembers.map(m=>{const memberDebtTotal=activeDebts.filter(d=>d.memberName===m.name).reduce((s,d)=>s+d.remaining,0);const deducted=Math.min(equalShare,memberDebtTotal);const stillOwes=Math.max(0,equalShare-memberDebtTotal);return{...m,equalShare,memberDebtTotal,deducted,stillOwes};});
