@@ -36,6 +36,7 @@ function Toast({msg,type}){if(!msg)return null;return <div style={{position:"fix
 function KPI({label,value,color,sub,icon,onClick}){return <div onClick={onClick} style={{background:T.white,borderRadius:16,padding:"16px 18px",boxShadow:"0 2px 10px rgba(0,0,0,.07)",borderTop:`4px solid ${color}`,flex:1,minWidth:0,cursor:onClick?"pointer":"default"}}><div style={{fontSize:20,marginBottom:2}}>{icon}</div><div style={{fontSize:10,color:T.gray,fontWeight:700,letterSpacing:.4,marginBottom:3,fontFamily:T.font}}>{label}</div><div style={{fontSize:20,fontWeight:800,color,fontFamily:T.font}}>{value}</div>{sub&&<div style={{fontSize:11,color:T.gray,marginTop:2,fontFamily:T.font}}>{sub}</div>}</div>;}
 const TH={padding:"8px 11px",fontSize:11,fontWeight:700,color:T.white,background:T.navy,textAlign:"right",fontFamily:T.font,whiteSpace:"nowrap"};
 const TD={padding:"8px 11px",fontSize:12,color:T.darkGray,borderBottom:`1px solid ${T.slate2}`,textAlign:"right",fontFamily:T.font};
+const ReadonlyBanner=({text})=><div style={{background:T.amberLight,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#92400E",textAlign:"center"}}>{text}</div>;
 export default function App(){
   const [members,setMembers]=useState([]);
   const [income,setIncome]=useState([]);
@@ -86,7 +87,7 @@ export default function App(){
   const activeDebts=useMemo(()=>debts.filter(d=>d.remaining>0),[debts]);
   const debtSummary=useMemo(()=>Object.values(activeDebts.reduce((acc,d)=>{if(!acc[d.memberName])acc[d.memberName]={memberName:d.memberName,memberType:d.memberType,total:0};acc[d.memberName].total+=d.remaining;return acc;},{})),[activeDebts]);
   const lastBalance=useMemo(()=>balances.length>0?balances[balances.length-1]:null,[balances]);
-  const totalCarryover=useMemo(()=>balances.reduce((s,b)=>s+(b.carryover||0),0),[balances]);
+  const pendingCarryover=useMemo(()=>lastBalance?.carryover||0,[lastBalance]);
   const nextAllowedMonth=useMemo(()=>{if(balances.length===0)return{month:FIRST_BALANCE_MONTH,year:FIRST_BALANCE_YEAR};const last=balances[balances.length-1];const lastIdx=MONTH_ORDER[last.month];if(lastIdx===12)return{month:"يناير",year:last.year+1};return{month:MONTHS[lastIdx],year:last.year};},[balances]);
   const recentIncome=useMemo(()=>[...income].sort((a,b)=>b.createdAt-a.createdAt).slice(0,20),[income]);
   const recentExpenses=useMemo(()=>[...expenses].sort((a,b)=>b.createdAt-a.createdAt).slice(0,20),[expenses]);
@@ -106,8 +107,7 @@ export default function App(){
     const selectedIdx=monthIndex(budgetMonth,budgetYear);
     const nextIdx=monthIndex(nextAllowedMonth.month,nextAllowedMonth.year);
     if(selectedIdx!==nextIdx){showToast(`⚠️ يجب إجراء موازنة ${nextAllowedMonth.month} ${nextAllowedMonth.year} أولاً`,"warn");return;}
-    const prevBalance=balances.length>0?balances[balances.length-1]:null;
-    const prevCarryover=prevBalance?.carryover||0;
+    const prevCarryover=pendingCarryover;
     const mInc=income.filter(r=>r.month===budgetMonth&&r.year===budgetYear).reduce((s,r)=>s+r.amount,0);
     const mExp=expenses.filter(r=>{const d=new Date(r.date);return MONTHS[d.getMonth()]===budgetMonth&&d.getFullYear()===budgetYear;}).reduce((s,r)=>s+r.amount,0);
     const bal=mInc-mExp;
@@ -163,20 +163,21 @@ export default function App(){
           onTouchStart={()=>setLogoPressDuration(Date.now())}
           onTouchEnd={()=>{if(logoPressDuration&&Date.now()-logoPressDuration>800)setModal("adminLogin");setLogoPressDuration(null);}}>
           🏡 حساب الاستراحة
+          {isAdmin&&<span style={{fontSize:11,background:"rgba(255,255,255,.2)",borderRadius:6,padding:"2px 8px",marginRight:8,verticalAlign:"middle"}}>محاسب</span>}
         </div>
         {isAdmin&&<div style={{marginTop:6}}><Btn size="sm" color="rgba(255,255,255,.15)" textColor={T.white} onClick={logoutAdmin}><IcLogout/> خروج المحاسب</Btn></div>}
-        <div style={{fontSize:12,color:"#BFDBFE",marginTop:6}}>{plusMembers.length} أعضاء+ · {members.filter(m=>m.type==="regular").length} أعضاء عاديون{isAdmin&&<span style={{marginRight:8,background:"rgba(255,255,255,.2)",borderRadius:6,padding:"1px 8px"}}>محاسب</span>}</div>
+        <div style={{fontSize:12,color:"#BFDBFE",marginTop:6}}>{plusMembers.length} أعضاء+ · {members.filter(m=>m.type==="regular").length} أعضاء عاديون</div>
         {lastBalance&&<div style={{fontSize:11,color:"#93C5FD",marginTop:2}}>آخر موازنة: {lastBalance.month} {lastBalance.year}</div>}
-        {totalCarryover>0&&<div style={{fontSize:11,color:T.amberLight||"#FEF3C7",marginTop:2}}>⚠️ فرق تقريب محمول: {fmt(totalCarryover)}</div>}
+        {pendingCarryover>0&&<div style={{fontSize:11,color:"#FEF3C7",marginTop:2}}>⚠️ فرق تقريب محمول للشهر القادم: {fmt(pendingCarryover)}</div>}
       </div>
       <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
         <Btn color={T.red} style={{width:180,justifyContent:"center"}} onClick={()=>{setExpF({desc:"",cat:"",memberName:"",date:todayStr(),amount:""});setExpErr({});setModal("expense");}}><IcPlus/> مصروف جديد</Btn>
-        {isAdmin&&<Btn color={T.green} style={{width:180,justifyContent:"center"}} onClick={()=>{setIncF({memberName:"",month:"",year:CURRENT_YEAR,date:todayStr(),amount:""});setIncErr({});setModal("income");}}><IcPlus/> إيراد جديد</Btn>}
-        {isAdmin&&<Btn color={T.white} textColor={T.navy} style={{width:180,justifyContent:"center"}} onClick={()=>setModal("members")}><IcUsers/> الأعضاء</Btn>}
+        <Btn color={T.green} style={{width:180,justifyContent:"center"}} onClick={()=>setModal("income")}><IcPlus/> إيراد جديد</Btn>
+        <Btn color={T.white} textColor={T.navy} style={{width:180,justifyContent:"center"}} onClick={()=>setModal("members")}><IcUsers/> الأعضاء</Btn>
       </div>
     </div>
     <div style={{display:"flex",gap:14,marginBottom:18,flexWrap:"wrap"}}>
-      <KPI label="إجمالي الإيرادات" value={fmt(totalInc)} color={T.green} icon="💰" sub={`${income.length} عملية${isAdmin?" — اضغط للتفاصيل":""}`} onClick={isAdmin?()=>setModal("incList"):null}/>
+      <KPI label="إجمالي الإيرادات" value={fmt(totalInc)} color={T.green} icon="💰" sub={`${income.length} عملية — اضغط للتفاصيل`} onClick={()=>setModal("incList")}/>
       <KPI label="إجمالي المصاريف" value={fmt(totalExp)} color={T.red} icon="📤" sub={`${expenses.length} عملية — اضغط للتفاصيل`} onClick={()=>setModal("expList")}/>
       <KPI label="الرصيد الحالي" value={fmt(Math.abs(balance))} color={balance>=0?T.blue:T.orange} icon={balance>=0?"✅":"⚠️"} sub={balance>=0?"فائض":"عجز"}/>
     </div>
@@ -184,7 +185,7 @@ export default function App(){
       <div style={{background:T.white,borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,.07)",overflow:"hidden"}}>
         <div style={{background:`linear-gradient(90deg,${T.greenDark}ee,${T.greenDark}bb)`,padding:"13px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span style={{color:T.white,fontWeight:700,fontSize:15}}>💰 الإيرادات</span>
-          {isAdmin&&<Btn size="sm" color={T.white} textColor={T.greenDark} onClick={()=>{setIncF({memberName:"",month:"",year:CURRENT_YEAR,date:todayStr(),amount:""});setIncErr({});setModal("income");}}><IcPlus/></Btn>}
+          <Btn size="sm" color={T.white} textColor={T.greenDark} onClick={()=>setModal("income")}><IcPlus/></Btn>
         </div>
         <div style={{maxHeight:300,overflowY:"auto",overflowX:"hidden"}}>
           <table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"}}>
@@ -212,12 +213,16 @@ export default function App(){
         </div>
       </div>
     </div>
-    {isAdmin&&(<div style={{display:"flex",gap:12,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
-      <select value={budgetYear} onChange={e=>{setBudgetYear(Number(e.target.value));setBudgetResult(null);}} style={{...selectSt,width:110,flex:"none"}}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select>
-      <select value={budgetMonth} onChange={e=>{setBudgetMonth(e.target.value);setBudgetResult(null);}} style={{...selectSt,width:160,flex:"none"}}><option value="">— اختر الشهر —</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select>
-      <Btn size="lg" color={T.navy} style={{flex:1,justifyContent:"center",minWidth:160}} onClick={calcBudget} disabled={processing}><IcCalc/> احسب الموازنة</Btn>
-      {lastBalance&&<Btn size="md" color={T.orange} style={{justifyContent:"center"}} onClick={resetLastBalance} disabled={processing}><IcReset/> Reset {lastBalance.month}</Btn>}
-    </div>)}
+    <div style={{display:"flex",gap:12,alignItems:"center",marginBottom:16,flexWrap:"wrap"}}>
+      {isAdmin?(<>
+        <select value={budgetYear} onChange={e=>{setBudgetYear(Number(e.target.value));setBudgetResult(null);}} style={{...selectSt,width:110,flex:"none"}}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select>
+        <select value={budgetMonth} onChange={e=>{setBudgetMonth(e.target.value);setBudgetResult(null);}} style={{...selectSt,width:160,flex:"none"}}><option value="">— اختر الشهر —</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select>
+        <Btn size="lg" color={T.navy} style={{flex:1,justifyContent:"center",minWidth:160}} onClick={calcBudget} disabled={processing}><IcCalc/> احسب الموازنة</Btn>
+        {lastBalance&&<Btn size="md" color={T.orange} style={{justifyContent:"center"}} onClick={resetLastBalance} disabled={processing}><IcReset/> Reset {lastBalance.month}</Btn>}
+      </>):(
+        <div style={{flex:1,padding:"12px 16px",background:T.slate2,borderRadius:12,fontSize:13,color:T.gray,textAlign:"center"}}>الموازنة غير مفعّلة لهذا الحساب</div>
+      )}
+    </div>
     <div style={{background:T.white,borderRadius:16,boxShadow:"0 2px 10px rgba(0,0,0,.07)",overflow:"hidden",marginBottom:16}}>
       <div style={{background:`linear-gradient(90deg,${T.purple}ee,${T.purple}bb)`,padding:"13px 18px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <span style={{color:T.white,fontWeight:700,fontSize:15}}>💳 الديون {activeDebts.length>0?`(${debtSummary.length} أعضاء)`:"— لا توجد ديون"}</span>
@@ -247,17 +252,18 @@ export default function App(){
       </Field>
       <Btn color={T.navy} style={{width:"100%",justifyContent:"center"}} onClick={loginAdmin}>دخول</Btn>
     </Modal>)}
-    {modal==="incList"&&isAdmin&&(<Modal title="💰 سجل الإيرادات" onClose={()=>setModal(null)} width={480}>
+    {modal==="incList"&&(<Modal title="💰 سجل الإيرادات" onClose={()=>setModal(null)} width={480}>
+      {!isAdmin&&<ReadonlyBanner text="إضافة الإيراد غير ممكنة لهذا الحساب"/>}
       <div style={{display:"flex",gap:10,marginBottom:16,flexWrap:"wrap"}}>
         <select value={incFilterMonth} onChange={e=>setIncFilterMonth(e.target.value)} style={{...selectSt,flex:1}}><option value="">كل الشهور</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select>
         <select value={incFilterYear} onChange={e=>setIncFilterYear(Number(e.target.value))} style={{...selectSt,width:110,flex:"none"}}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select>
       </div>
       <div style={{borderRadius:12,overflow:"hidden",border:`1px solid ${T.slate3}`}}>
         <table style={{width:"100%",borderCollapse:"collapse"}}>
-          <thead><tr>{["العضو","الشهر","السنة","تاريخ الدفع","المبلغ",""].map(h=><th key={h} style={TH}>{h}</th>)}</tr></thead>
+          <thead><tr>{["العضو","الشهر","السنة","تاريخ الدفع","المبلغ",isAdmin?"":""].map((h,i)=><th key={i} style={TH}>{h}</th>)}</tr></thead>
           <tbody>
-            {filteredIncome.length===0&&<tr><td colSpan={6} style={{...TD,textAlign:"center",color:T.gray,padding:20}}>لا توجد إيرادات</td></tr>}
-            {filteredIncome.map(r=>(<tr key={r.id}><td style={TD}>{r.memberName}</td><td style={TD}>{r.month}</td><td style={{...TD,fontSize:11}}>{r.year}</td><td style={{...TD,fontSize:11}}>{r.date}</td><td style={{...TD,color:T.green,fontWeight:700}}>{fmt(r.amount)}</td><td style={{...TD,padding:"4px 6px"}}><button onClick={()=>del("income",r.id)} style={{background:T.redLight,border:"none",borderRadius:6,padding:"4px 6px",cursor:"pointer",color:T.red,display:"flex"}}><IcTrash/></button></td></tr>))}
+            {filteredIncome.length===0&&<tr><td colSpan={isAdmin?6:5} style={{...TD,textAlign:"center",color:T.gray,padding:20}}>لا توجد إيرادات</td></tr>}
+            {filteredIncome.map(r=>(<tr key={r.id}><td style={TD}>{r.memberName}</td><td style={TD}>{r.month}</td><td style={{...TD,fontSize:11}}>{r.year}</td><td style={{...TD,fontSize:11}}>{r.date}</td><td style={{...TD,color:T.green,fontWeight:700}}>{fmt(r.amount)}</td>{isAdmin&&<td style={{...TD,padding:"4px 6px"}}><button onClick={()=>del("income",r.id)} style={{background:T.redLight,border:"none",borderRadius:6,padding:"4px 6px",cursor:"pointer",color:T.red,display:"flex"}}><IcTrash/></button></td>}</tr>))}
           </tbody>
         </table>
       </div>
@@ -279,8 +285,17 @@ export default function App(){
       </div>
       <div style={{marginTop:14,padding:"10px 14px",background:T.redLight,borderRadius:10,textAlign:"center",fontSize:13,color:T.redDark,fontWeight:700}}>الإجمالي: {fmt(filteredExpenses.reduce((s,r)=>s+r.amount,0))}</div>
     </Modal>)}
-    {modal==="members"&&isAdmin&&(<Modal title={`👥 الأعضاء (${members.length})`} onClose={()=>setModal(null)} width={440}><div style={{background:T.blueLight,borderRadius:12,padding:"14px 16px",marginBottom:16}}><div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:10}}>إضافة عضو جديد</div><div style={{display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}><div style={{flex:2,minWidth:120}}><input style={{...inputSt,borderColor:memErr.name?T.red:T.slate3}} placeholder="اسم العضو" value={memF.name} onChange={e=>setMemF(p=>({...p,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&submitMember()}/>{memErr.name&&<div style={{fontSize:11,color:T.red,marginTop:2}}>{memErr.name}</div>}</div><div style={{flex:1,minWidth:100}}><select style={selectSt} value={memF.type} onChange={e=>setMemF(p=>({...p,type:e.target.value}))}><option value="regular">عضو</option><option value="plus">عضو+</option></select></div><Btn color={T.blue} onClick={submitMember}><IcPlus/> إضافة</Btn></div></div><div style={{display:"flex",gap:16,marginBottom:12,fontSize:12,color:T.gray}}><span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:T.purple,marginLeft:5}}/>عضو+ يغطي العجز</span><span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:T.gray,marginLeft:5}}/>عضو عادي</span></div><div style={{maxHeight:340,overflowY:"auto"}}>{members.length===0&&<div style={{textAlign:"center",color:T.gray,padding:20}}>لا يوجد أعضاء</div>}{members.map(m=>(<div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",borderRadius:10,marginBottom:6,background:m.type==="plus"?T.purpleLight:T.slate2}}><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{width:34,height:34,borderRadius:"50%",background:m.type==="plus"?T.purple:T.gray,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700}}>{m.name[0]}</span><div><div style={{fontWeight:700,color:T.darkGray,fontSize:14}}>{m.name}</div><span className="badge" style={{background:m.type==="plus"?T.purple:T.gray,color:T.white,fontSize:10}}>{m.type==="plus"?"عضو+":"عضو"}</span></div></div><button onClick={()=>del("members",m.id)} style={{background:T.redLight,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer",color:T.red,display:"flex"}}><IcTrash/></button></div>))}</div></Modal>)}
-    {modal==="income"&&isAdmin&&(<Modal title="💰 تسجيل إيراد جديد" onClose={()=>setModal(null)}><Field label="العضو" required error={incErr.member}><select style={{...selectSt,borderColor:incErr.member?T.red:T.slate3}} value={incF.memberName} onChange={e=>setIncF(p=>({...p,memberName:e.target.value}))}><option value="">— اختر العضو —</option>{members.filter(m=>m.type==="plus").length>0&&<optgroup label="── أعضاء+">{members.filter(m=>m.type==="plus").map(m=><option key={m.id} value={m.name}>{m.name} (عضو+)</option>)}</optgroup>}{members.filter(m=>m.type==="regular").length>0&&<optgroup label="── أعضاء عاديون">{members.filter(m=>m.type==="regular").map(m=><option key={m.id} value={m.name}>{m.name}</option>)}</optgroup>}</select></Field><Field label="الشهر" required error={incErr.month}><select style={{...selectSt,borderColor:incErr.month?T.red:T.slate3}} value={incF.month} onChange={e=>setIncF(p=>({...p,month:e.target.value}))}><option value="">— اختر الشهر —</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select></Field><Field label="السنة" required><select style={selectSt} value={incF.year} onChange={e=>setIncF(p=>({...p,year:Number(e.target.value)}))}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select></Field><Field label="تاريخ الدفع" required error={incErr.date}><input type="date" style={{...inputSt,borderColor:incErr.date?T.red:T.slate3}} value={incF.date} onChange={e=>setIncF(p=>({...p,date:e.target.value}))}/></Field><Field label="المبلغ (ر.س)" required error={incErr.amount}><input type="number" min="1" style={{...inputSt,borderColor:incErr.amount?T.red:T.slate3}} placeholder="100" value={incF.amount} onChange={e=>setIncF(p=>({...p,amount:e.target.value}))}/></Field><div style={{display:"flex",gap:10,marginTop:4}}><Btn color={T.green} style={{flex:1,justifyContent:"center"}} onClick={submitIncome}>تسجيل الإيراد</Btn><Btn color={T.slate2} textColor={T.gray} style={{flex:1,justifyContent:"center"}} onClick={()=>setModal(null)}>إلغاء</Btn></div></Modal>)}
+    {modal==="members"&&(<Modal title={`👥 الأعضاء (${members.length})`} onClose={()=>setModal(null)} width={440}>
+      {!isAdmin&&<ReadonlyBanner text="إضافة الأعضاء غير ممكنة لهذا الحساب"/>}
+      {isAdmin&&<div style={{background:T.blueLight,borderRadius:12,padding:"14px 16px",marginBottom:16}}><div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:10}}>إضافة عضو جديد</div><div style={{display:"flex",gap:10,alignItems:"flex-start",flexWrap:"wrap"}}><div style={{flex:2,minWidth:120}}><input style={{...inputSt,borderColor:memErr.name?T.red:T.slate3}} placeholder="اسم العضو" value={memF.name} onChange={e=>setMemF(p=>({...p,name:e.target.value}))} onKeyDown={e=>e.key==="Enter"&&submitMember()}/>{memErr.name&&<div style={{fontSize:11,color:T.red,marginTop:2}}>{memErr.name}</div>}</div><div style={{flex:1,minWidth:100}}><select style={selectSt} value={memF.type} onChange={e=>setMemF(p=>({...p,type:e.target.value}))}><option value="regular">عضو</option><option value="plus">عضو+</option></select></div><Btn color={T.blue} onClick={submitMember}><IcPlus/> إضافة</Btn></div></div>}
+      <div style={{display:"flex",gap:16,marginBottom:12,fontSize:12,color:T.gray}}><span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:T.purple,marginLeft:5}}/>عضو+ يغطي العجز</span><span><span style={{display:"inline-block",width:10,height:10,borderRadius:"50%",background:T.gray,marginLeft:5}}/>عضو عادي</span></div>
+      <div style={{maxHeight:340,overflowY:"auto"}}>{members.length===0&&<div style={{textAlign:"center",color:T.gray,padding:20}}>لا يوجد أعضاء</div>}{members.map(m=>(<div key={m.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",borderRadius:10,marginBottom:6,background:m.type==="plus"?T.purpleLight:T.slate2}}><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{width:34,height:34,borderRadius:"50%",background:m.type==="plus"?T.purple:T.gray,color:T.white,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:700}}>{m.name[0]}</span><div><div style={{fontWeight:700,color:T.darkGray,fontSize:14}}>{m.name}</div><span className="badge" style={{background:m.type==="plus"?T.purple:T.gray,color:T.white,fontSize:10}}>{m.type==="plus"?"عضو+":"عضو"}</span></div></div>{isAdmin&&<button onClick={()=>del("members",m.id)} style={{background:T.redLight,border:"none",borderRadius:8,padding:"6px 8px",cursor:"pointer",color:T.red,display:"flex"}}><IcTrash/></button>}</div>))}</div>
+    </Modal>)}
+    {modal==="income"&&(<Modal title="💰 تسجيل إيراد جديد" onClose={()=>setModal(null)}>
+      {!isAdmin&&<ReadonlyBanner text="إضافة الإيراد غير ممكنة لهذا الحساب"/>}
+      {isAdmin&&<><Field label="العضو" required error={incErr.member}><select style={{...selectSt,borderColor:incErr.member?T.red:T.slate3}} value={incF.memberName} onChange={e=>setIncF(p=>({...p,memberName:e.target.value}))}><option value="">— اختر العضو —</option>{members.filter(m=>m.type==="plus").length>0&&<optgroup label="── أعضاء+">{members.filter(m=>m.type==="plus").map(m=><option key={m.id} value={m.name}>{m.name} (عضو+)</option>)}</optgroup>}{members.filter(m=>m.type==="regular").length>0&&<optgroup label="── أعضاء عاديون">{members.filter(m=>m.type==="regular").map(m=><option key={m.id} value={m.name}>{m.name}</option>)}</optgroup>}</select></Field><Field label="الشهر" required error={incErr.month}><select style={{...selectSt,borderColor:incErr.month?T.red:T.slate3}} value={incF.month} onChange={e=>setIncF(p=>({...p,month:e.target.value}))}><option value="">— اختر الشهر —</option>{MONTHS.map(m=><option key={m} value={m}>{m}</option>)}</select></Field><Field label="السنة" required><select style={selectSt} value={incF.year} onChange={e=>setIncF(p=>({...p,year:Number(e.target.value)}))}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select></Field><Field label="تاريخ الدفع" required error={incErr.date}><input type="date" style={{...inputSt,borderColor:incErr.date?T.red:T.slate3}} value={incF.date} onChange={e=>setIncF(p=>({...p,date:e.target.value}))}/></Field><Field label="المبلغ (ر.س)" required error={incErr.amount}><input type="number" min="1" style={{...inputSt,borderColor:incErr.amount?T.red:T.slate3}} placeholder="100" value={incF.amount} onChange={e=>setIncF(p=>({...p,amount:e.target.value}))}/></Field><div style={{display:"flex",gap:10,marginTop:4}}><Btn color={T.green} style={{flex:1,justifyContent:"center"}} onClick={submitIncome}>تسجيل الإيراد</Btn><Btn color={T.slate2} textColor={T.gray} style={{flex:1,justifyContent:"center"}} onClick={()=>setModal(null)}>إلغاء</Btn></div></>}
+      {!isAdmin&&<Btn color={T.slate2} textColor={T.gray} style={{width:"100%",justifyContent:"center"}} onClick={()=>setModal(null)}>إغلاق</Btn>}
+    </Modal>)}
     {modal==="expense"&&(<Modal title="📤 تسجيل مصروف جديد" onClose={()=>setModal(null)}><Field label="وصف المصروف" required error={expErr.desc}><input style={{...inputSt,borderColor:expErr.desc?T.red:T.slate3}} placeholder="مثال: فاتورة الكهرباء" value={expF.desc} onChange={e=>setExpF(p=>({...p,desc:e.target.value}))}/></Field><Field label="التصنيف (اختياري)"><select style={selectSt} value={expF.cat} onChange={e=>setExpF(p=>({...p,cat:e.target.value}))}><option value="">— اختر تصنيفاً —</option>{CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}</select></Field><Field label="العضو (اختياري)"><select style={selectSt} value={expF.memberName} onChange={e=>setExpF(p=>({...p,memberName:e.target.value}))}><option value="">— من حساب الاستراحة —</option>{members.filter(m=>m.type==="plus").length>0&&<optgroup label="── أعضاء+">{members.filter(m=>m.type==="plus").map(m=><option key={m.id} value={m.name}>{m.name} (عضو+)</option>)}</optgroup>}{members.filter(m=>m.type==="regular").length>0&&<optgroup label="── أعضاء عاديون">{members.filter(m=>m.type==="regular").map(m=><option key={m.id} value={m.name}>{m.name}</option>)}</optgroup>}</select>{expF.memberName&&<div style={{fontSize:11,color:T.purple,marginTop:3,fontFamily:T.font}}>⚡ سيُسجَّل دين باسم {expF.memberName}</div>}</Field><Field label="المبلغ (ر.س)" required error={expErr.amount}><input type="number" min="1" style={{...inputSt,borderColor:expErr.amount?T.red:T.slate3}} placeholder="0" value={expF.amount} onChange={e=>setExpF(p=>({...p,amount:e.target.value}))}/></Field><Field label="التاريخ"><input type="date" style={inputSt} value={expF.date} onChange={e=>setExpF(p=>({...p,date:e.target.value}))}/></Field><div style={{display:"flex",gap:10,marginTop:4}}><Btn color={T.red} style={{flex:1,justifyContent:"center"}} onClick={submitExpense}>تسجيل المصروف</Btn><Btn color={T.slate2} textColor={T.gray} style={{flex:1,justifyContent:"center"}} onClick={()=>setModal(null)}>إلغاء</Btn></div></Modal>)}
     {modal==="budget"&&budgetResult&&(<Modal title={`📊 موازنة ${budgetResult.month} ${budgetResult.year}`} onClose={()=>setModal(null)} width={500}>
       <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
@@ -290,7 +305,7 @@ export default function App(){
       {budgetResult.deficit>0?(<>
         <div style={{background:T.amberLight,border:`1px solid ${T.amber}44`,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#92400E"}}>
           ⚠️ العجز الإجمالي <strong>{fmt(budgetResult.deficit)}</strong> — نصيب كل عضو+ <strong>{fmt(budgetResult.sharePerMember)}</strong>
-          {budgetResult.carryover>0&&<span style={{marginRight:8,fontSize:11}}>· فرق تقريب يُحمل للشهر القادم: {fmt(budgetResult.carryover)}</span>}
+          {budgetResult.carryover>0&&<div style={{fontSize:11,marginTop:4}}>فرق تقريب يُحمل للشهر القادم: <strong>{fmt(budgetResult.carryover)}</strong></div>}
         </div>
         <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:8}}>توزيع العجز:</div>
         <div style={{borderRadius:12,overflow:"hidden",border:`1px solid ${T.slate3}`,marginBottom:12}}>
