@@ -114,8 +114,9 @@ export default function App(){
     const rawDeficit=bal<0?Math.abs(bal):0;
     const deficit=rawDeficit+prevCarryover;
     const n=plusMembers.length;
-    const sharePerMember=n>0?Math.floor(deficit/n):0;
-    const carryover=deficit-(sharePerMember*n);
+    const rawShare=n>0?deficit/n:0;
+    const sharePerMember=Math.floor(rawShare);
+    const carryover=n>0?(rawShare-sharePerMember)*n:0;
     const memberBreakdown=plusMembers.map(m=>{const memberDebtTotal=activeDebts.filter(d=>d.memberName===m.name).reduce((s,d)=>s+d.remaining,0);const deducted=Math.min(sharePerMember,memberDebtTotal);const stillOwes=Math.max(0,sharePerMember-memberDebtTotal);return{...m,sharePerMember,memberDebtTotal,deducted,stillOwes};});
     const totalDeducted=memberBreakdown.reduce((s,m)=>s+m.deducted,0);
     const realDeficit=deficit-totalDeducted;
