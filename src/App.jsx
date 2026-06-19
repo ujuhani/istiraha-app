@@ -169,7 +169,7 @@ export default function App(){
           {isAdmin&&<div style={{marginTop:6}}><Btn size="sm" color="rgba(255,255,255,.15)" textColor={T.white} onClick={logoutAdmin}><IcLogout/> خروج المحاسب</Btn></div>}
           <div style={{fontSize:12,color:"#BFDBFE",marginTop:6}}>{plusMembers.length} أعضاء+ · {members.filter(m=>m.type==="regular").length} أعضاء عاديون</div>
           {lastBalance&&<div style={{fontSize:11,color:"#93C5FD",marginTop:2}}>آخر موازنة: {lastBalance.month} {lastBalance.year}</div>}
-          {pendingCarryover>0&&<div style={{fontSize:11,color:"#FEF3C7",marginTop:2}}>⚠️ فرق تقريب محمول: {fmt(pendingCarryover)}</div>}
+          
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8,alignItems:"stretch"}}>
           <Btn color={T.red} style={{width:170,justifyContent:"center"}} onClick={()=>{setExpF({desc:"",cat:"",memberName:"",date:todayStr(),amount:""});setExpErr({});setModal("expense");}}><IcPlus/> مصروف جديد</Btn>
@@ -301,11 +301,11 @@ export default function App(){
       <div style={{display:"flex",gap:10,marginBottom:14,flexWrap:"wrap"}}>
         {[{label:"الإيرادات",val:budgetResult.mInc,color:T.green,bg:T.greenLight},{label:"المصاريف",val:budgetResult.mExp,color:T.red,bg:T.redLight},{label:budgetResult.bal>=0?"فائض":"عجز",val:Math.abs(budgetResult.bal),color:budgetResult.bal>=0?T.blue:T.orange,bg:budgetResult.bal>=0?"#EFF6FF":T.orangeLight}].map(item=>(<div key={item.label} style={{flex:1,minWidth:110,background:item.bg,borderRadius:12,padding:"12px 14px",textAlign:"center"}}><div style={{fontSize:10,color:T.gray,fontWeight:700,marginBottom:4}}>{item.label}</div><div style={{fontSize:17,fontWeight:800,color:item.color}}>{fmt(item.val)}</div></div>))}
       </div>
-      {budgetResult.prevCarryover>0&&<div style={{background:T.amberLight,borderRadius:10,padding:"8px 14px",marginBottom:12,fontSize:12,color:"#92400E",display:"flex",justifyContent:"space-between"}}><span>+ فرق تقريب محمول من الشهر السابق</span><strong>{fmt(budgetResult.prevCarryover)}</strong></div>}
+      
       {budgetResult.deficit>0?(<>
         <div style={{background:T.amberLight,border:`1px solid ${T.amber}44`,borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#92400E"}}>
           ⚠️ العجز الإجمالي <strong>{fmt(budgetResult.deficit)}</strong> — نصيب كل عضو+ <strong>{fmt(budgetResult.sharePerMember)}</strong>
-          {budgetResult.carryover>0&&<div style={{fontSize:11,marginTop:4}}>فرق تقريب يُحمل للشهر القادم: <strong>{fmt(budgetResult.carryover)}</strong></div>}
+          
         </div>
         <div style={{fontSize:13,fontWeight:700,color:T.navy,marginBottom:8}}>توزيع العجز:</div>
         <div style={{borderRadius:12,overflow:"hidden",border:`1px solid ${T.slate3}`,marginBottom:12}}>
