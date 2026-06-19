@@ -117,8 +117,8 @@ export default function App(){
     const deficit=rawDeficit+prevCarryover;
     const n=plusMembers.length;
     const rawShare=n>0?deficit/n:0;
-    const sharePerMember=Math.floor(rawShare);
-    const carryover=n>0?(rawShare-sharePerMember)*n:0;
+    const sharePerMember=Math.round(rawShare);
+    const carryover=0;
     const memberBreakdown=plusMembers.map(m=>{const memberDebtTotal=activeDebts.filter(d=>d.memberName===m.name).reduce((s,d)=>s+d.remaining,0);const deducted=Math.min(sharePerMember,memberDebtTotal);const stillOwes=Math.max(0,sharePerMember-memberDebtTotal);return{...m,sharePerMember,memberDebtTotal,deducted,stillOwes};});
     const totalDeducted=memberBreakdown.reduce((s,m)=>s+m.deducted,0);
     const realDeficit=deficit-totalDeducted-carryover;
