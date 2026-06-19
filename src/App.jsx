@@ -83,7 +83,7 @@ export default function App(){
   const totalInc=useMemo(()=>income.reduce((s,r)=>s+r.amount,0),[income]);
   const totalExp=useMemo(()=>expenses.reduce((s,r)=>s+r.amount,0),[expenses]);
   const totalCredits=useMemo(()=>credits.reduce((s,c)=>s+c.amount,0),[credits]);
-  const balance=totalInc+totalCredits-totalExp;
+  const balance=totalInc+totalCredits+pendingCarryover-totalExp;
   const activeDebts=useMemo(()=>debts.filter(d=>d.remaining>0),[debts]);
   const debtSummary=useMemo(()=>Object.values(activeDebts.reduce((acc,d)=>{if(!acc[d.memberName])acc[d.memberName]={memberName:d.memberName,memberType:d.memberType,total:0};acc[d.memberName].total+=d.remaining;return acc;},{})),[activeDebts]);
   const lastBalance=useMemo(()=>balances.length>0?balances[balances.length-1]:null,[balances]);
