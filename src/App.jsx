@@ -165,9 +165,9 @@ export default function App(){
           <div style={{fontSize:22,fontWeight:800,color:T.white,cursor:"pointer",userSelect:"none",display:"flex",alignItems:"center",gap:8}}
             onMouseDown={startPress} onMouseUp={endPress} onTouchStart={startPress} onTouchEnd={endPress}>
             🏡 حساب الاستراحة
-            {isAdmin&&<span style={{fontSize:11,background:"rgba(255,255,255,.2)",borderRadius:6,padding:"2px 8px"}}>محاسب</span>}
+            
           </div>
-          {isAdmin&&<div style={{marginTop:6}}><Btn size="sm" color="rgba(255,255,255,.15)" textColor={T.white} onClick={logoutAdmin}><IcLogout/> خروج المحاسب</Btn></div>}
+          {isAdmin{isAdmin&&<div style={{marginTop:6}}><Btn size="sm" color="rgba(255,255,255,.15)" textColor={T.white} onClick={logoutAdmin}><IcLogout/> خروج المحاسب</Btn></div>}{isAdmin&&<div style={{marginTop:6}}><Btn size="sm" color="rgba(255,255,255,.15)" textColor={T.white} onClick={logoutAdmin}><IcLogout/> خروج المحاسب</Btn></div>}<div style={{marginTop:6}}><div style={{fontSize:11,color:"rgba(255,255,255,.7)",marginBottom:4}}>محاسب</div><Btn size="sm" color="rgba(255,255,255,.15)" textColor={T.white} onClick={logoutAdmin}><IcLogout/> خروج المحاسب</Btn></div>}
           <div style={{fontSize:12,color:"#BFDBFE",marginTop:6}}>{plusMembers.length} أعضاء+ · {members.filter(m=>m.type==="regular").length} أعضاء عاديون</div>
           {lastBalance&&<div style={{fontSize:11,color:"#93C5FD",marginTop:2}}>آخر موازنة: {lastBalance.month} {lastBalance.year}</div>}
           
